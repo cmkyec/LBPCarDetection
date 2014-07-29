@@ -3,7 +3,7 @@
 #include "utility.h"
 #include "LBPCarDetect.h"
 
-/*
+
 int main()
 {
 	std::string textFilePath("./imageData/negative_train2_path.txt");
@@ -22,19 +22,19 @@ int main()
 	}
 	std::cout << "100%" << std::endl;
 
-	std::string featureFilePath("./negative_train2_feature.dat");
+	std::string featureFilePath("./negative_train_feature_method2.dat");
 	writeSVMTrainingData(features, featureFilePath, -1);
 	system("pause");
 	return 0;
 }
-*/
+
 
 /*
 int main()
 {
 	const char* posTxtFile = "./imageData/positive_train_path.txt";
 	const char* negTxtFile = "./imageData/negative_train2_path.txt";
-	const char* modelFile = "./car_lbp.model";
+	const char* modelFile = "./car_lbp2_method2.model";
 	gentech::CLBPCarDetect detector;
 
 	detector.train(posTxtFile, negTxtFile, modelFile);
@@ -102,23 +102,15 @@ int main()
 }
 */
 
-
+/*
 int main()
 {
-	const char* modelFilePath = "./features/car_lbp2.model";
-	//const char* modelFilePath = "./features/car_lbp.model";
-	//float thres = 2.7f;
-	float thres = 1.f;
+	const char* modelFilePath = "./features/car_lbp2_method2.model";
+	float thres = 1.98f;
 	gentech::CLBPCarDetect detector(modelFilePath, thres);
-	
-	cv::Mat img = cv::imread("./testImages/00045.png");
+	cv::Mat img = cv::imread("./testImages/00036.png");
 	std::vector<cv::Rect> carPos;
-	int64 start = cv::getTickCount();
 	detector.detect(img, carPos);
-	int64 end = cv::getTickCount();
-	double elapsed = (end - start) * 1.0 / cv::getTickFrequency();
-	std::cout << "elapsed time is: " << elapsed << std::endl;
-
 	for (std::size_t i = 0; i < carPos.size(); ++i) {
 		cv::rectangle(img, carPos[i], cv::Scalar(0, 255, 255));
 	}
@@ -127,12 +119,12 @@ int main()
 
 	return 0;
 }
-
+*/
 
 /*
 int main()
 {
-	const char* modelFilePath = "./features/car_lbp2.model";
+	const char* modelFilePath = "./features/car_lbp2_method2.model";
 	float thres = 1.7f;
 	gentech::CLBPCarDetect detector(modelFilePath, thres);
 
@@ -164,8 +156,8 @@ int main()
 int main()
 {
 	cv::Mat img = cv::imread("./testImages/1.png");
-	const char* modelFilePath = "./features/car_lbp2.model";
-	float thres = 1.7f;
+	const char* modelFilePath = "./features/car_lbp2_method2.model";
+	float thres = 1.f;
 	gentech::CLBPCarDetect detector(modelFilePath, thres);
 
 	float v = detector.predict(img);

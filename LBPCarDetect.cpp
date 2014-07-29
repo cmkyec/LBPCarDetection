@@ -64,7 +64,6 @@ static void LBPImage(cv::Mat& src, cv::Mat& lbp)
 	else {
 		src.copyTo(grayImg);
 	}
-	cv::copyMakeBorder(grayImg, grayImg, 1, 1, 1, 1, cv::BORDER_REFLECT_101);
 
 	lbp.create(src.size(), src.depth());
 	lbp.setTo(0);
@@ -72,7 +71,7 @@ static void LBPImage(cv::Mat& src, cv::Mat& lbp)
 		const uchar* prev = grayImg.ptr(r - 1);
 		const uchar* curr = grayImg.ptr(r);
 		const uchar* next = grayImg.ptr(r + 1);
-		uchar* pdst = lbp.ptr(r - 1);
+		uchar* pdst = lbp.ptr(r);
 		for (int c = 1; c < grayImg.cols - 1; ++c) {
 			uchar center = curr[c];
 			int value = 0;
@@ -84,7 +83,7 @@ static void LBPImage(cv::Mat& src, cv::Mat& lbp)
 			if (prev[c - 1] > center)  value |= 0x01 << 5;
 			if (prev[c] > center)      value |= 0x01 << 6;
 			if (prev[c + 1] > center)  value |= 0x01 << 7;
-			pdst[c - 1] = (uchar)g_lookTable[value];
+			pdst[c] = (uchar)g_lookTable[value];
 		}
 	}
 }
@@ -109,14 +108,17 @@ CLBPCarDetect::CLBPCarDetect(const char* modelFilePath, float thres)
 
 void CLBPCarDetect::computer(cv::Mat& img, std::vector<float>& features)
 {
+	CV_Assert(img.rows == 48 && img.cols == 48);
+
 	static cv::Mat lbp;
 	LBPImage(img, lbp);
 
 	features.resize(58 * 9, 0);
 	float* p = &(features[0]);
-	for (int y = 0; y <= img.rows - 24; y += 12) {
-		for (int x = 0; x <= img.cols - 24; x += 12) {
-			cv::Rect rect(x, y, 24, 24);
+	// the boundary of the lbp is ignored, actually 46x46 rectangle is used.
+	for (int r = 1; r <= 23; r += 11) {
+		for (int c = 1; c <= 23; c += 11) {
+			cv::Rect rect(c, r, 24, 24);
 			histFill(lbp, rect, p);
 			p += 58;
 		}
@@ -134,17 +136,17 @@ void CLBPCarDetect::auxiliaryImg(cv::Mat& img, cv::Mat& auImg)
 	cv::Mat _auImg;
 	_auImg.create(lbp.size(), CV_32F);
 	_auImg.setTo(0);
-	for (int r = 0; r < _auImg.rows - g_window_size / 2; ++r) {
-		for (int c = 0; c < _auImg.cols - g_window_size / 2; ++c) {
+	for (int r = 1; r <= _auImg.rows - g_window_size / 2; ++r) {
+		for (int c = 1; c <= _auImg.cols - g_window_size / 2; ++c) {
 			_auImg.at<float>(r, c) = m_w[(int)lbp.at<uchar>(r, c)] +
-				m_w[(int)lbp.at<uchar>(r, c + 12) + 58] +
-				m_w[(int)lbp.at<uchar>(r, c + 24) + 116] +
-				m_w[(int)lbp.at<uchar>(r + 12, c) + 174] +
-				m_w[(int)lbp.at<uchar>(r + 12, c + 12) + 232] +
-				m_w[(int)lbp.at<uchar>(r + 12, c + 24) + 290] +
-				m_w[(int)lbp.at<uchar>(r + 24, c) + 348] +
-				m_w[(int)lbp.at<uchar>(r + 24, c + 12) + 406] +
-				m_w[(int)lbp.at<uchar>(r + 24, c + 24) + 464];
+				m_w[(int)lbp.at<uchar>(r, c + 11) + 58] +
+				m_w[(int)lbp.at<uchar>(r, c + 22) + 116] +
+				m_w[(int)lbp.at<uchar>(r + 11, c) + 174] +
+				m_w[(int)lbp.at<uchar>(r + 11, c + 11) + 232] +
+				m_w[(int)lbp.at<uchar>(r + 11, c + 22) + 290] +
+				m_w[(int)lbp.at<uchar>(r + 22, c) + 348] +
+				m_w[(int)lbp.at<uchar>(r + 22, c + 11) + 406] +
+				m_w[(int)lbp.at<uchar>(r + 22, c + 22) + 464];
 		}
 	}
 	cv::integral(_auImg, auImg, CV_32F);
@@ -160,18 +162,8 @@ float CLBPCarDetect::predict(cv::Mat& img)
 		img.copyTo(grayImg);
 	}
 
-	//cv::Mat auImg;
-	//auxiliaryImg(grayImg, auImg);
-	//float v = auImg.at<float>(24, 24) +
-	//	  auImg.at<float>(0, 0) -
-	//	  auImg.at<float>(24, 0) -
-	//	  auImg.at<float>(0, 24);
-	//return v / 576;
-
-
 	std::vector<float> feature;
 	computer(grayImg, feature);
-
 	float v = 0.f;
 	for (std::size_t i = 0; i < feature.size(); ++i) {
 		v += m_w[i] * feature[i];
@@ -231,37 +223,20 @@ void CLBPCarDetect::detect(cv::Mat& img, std::vector<cv::Rect>& carPos)
 	std::vector<cv::Rect> rawCarPos;
 	std::vector<float> scores;
 	double shrink = 1.0;
-	//while (grayImg.rows > 100 && grayImg.cols > 100) {
-	//	cv::Mat auImg;
-	//	auxiliaryImg(grayImg, auImg);
-	//	cv::Mat lbp;
-	//	LBPImage(grayImg, lbp);
-	//	for (int r = 0; r < grayImg.rows - 48; r += 24) {
-	//		for (int c = 0; c < grayImg.cols - 48; c += 24) {
-	//			float v = auImg.at<float>(r, c) +
-	//				  auImg.at<float>(r + 24, c + 24) -
-	//				  auImg.at<float>(r + 24, 0)  -
-	//				  auImg.at<float>(0, c + 24);
-	//			v = v / 576;
-	//			if (v > m_b) {
-	//				cv::Rect rect(c, r, 48, 48);
-	//				rect.x = cvRound(rect.x / shrink);
-	//				rect.y = cvRound(rect.y / shrink);
-	//				rawCarPos.push_back(rect);
-	//				scores.push_back(v);
-	//			}
-	//		}
-	//	}
-	//	shrink *= 0.85;
-	//	cv::resize(grayImg, grayImg, cv::Size(), shrink, shrink);
-	//}
 	while (grayImg.rows > 100 && grayImg.cols > 100) {
-		for (int r = 24; r < grayImg.rows - 48; r += 24) {
-			for (int c = 24; c < grayImg.cols - 48; c += 24) {
-				cv::Rect rect(c, r, 48, 48);
-				cv::Mat imgTmp = grayImg(rect);
-				float v = predict(imgTmp);
+		cv::Mat auImg;
+		auxiliaryImg(grayImg, auImg);
+		cv::Mat lbp;
+		LBPImage(grayImg, lbp);
+		for (int r = 12; r < grayImg.rows - 48; r += 24) {
+			for (int c = 12; c < grayImg.cols - 48; c += 24) {
+				float v = auImg.at<float>(r + 1, c + 1) +
+					  auImg.at<float>(r + 25, c + 25) -
+					  auImg.at<float>(r + 25, c + 1)  -
+					  auImg.at<float>(r + 1, c + 25);
+				v = v / 576;
 				if (v > m_b) {
+					cv::Rect rect(c, r, 48, 48);
 					rect.x = cvRound(rect.x / shrink);
 					rect.y = cvRound(rect.y / shrink);
 					rawCarPos.push_back(rect);
