@@ -1,0 +1,7 @@
+features/
+imageData/
+testImages/
+test/
+x64/
+*.vcxproj
+*.filters
