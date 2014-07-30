@@ -3,7 +3,7 @@
 #include "utility.h"
 #include "LBPCarDetect.h"
 
-
+/*
 int main()
 {
 	std::string textFilePath("./imageData/negative_train2_path.txt");
@@ -27,9 +27,9 @@ int main()
 	system("pause");
 	return 0;
 }
+*/
 
 
-/*
 int main()
 {
 	const char* posTxtFile = "./imageData/positive_train_path.txt";
@@ -41,7 +41,7 @@ int main()
 	system("pause");
 	return 0;
 }
-*/
+
 
 /*
 int main()
@@ -136,6 +136,9 @@ int main()
 	}
 	
 	cv::Mat Frame;
+	//char savepath[200];
+	//memset(savepath, 0, sizeof(savepath));
+	//int index = 1;
 	while (true) {
 		video >> Frame;
 		if (!Frame.data) break;
@@ -145,7 +148,9 @@ int main()
 		for (std::size_t i = 0; i < carPos.size(); ++i) {
 			cv::rectangle(Frame, carPos[i], cv::Scalar(0, 255, 255));
 		}
-		cv::imshow("show", Frame);
+		//sprintf_s(savepath, sizeof(savepath), "./test/%05d.png", index++);
+		//cv::imwrite(savepath, Frame);
+		cv::imshow("show", Frame); 
 		if (cv::waitKey(1) == 27) break;
 	}
 	return 0;

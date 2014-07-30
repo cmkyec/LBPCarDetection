@@ -226,8 +226,6 @@ void CLBPCarDetect::detect(cv::Mat& img, std::vector<cv::Rect>& carPos)
 	while (grayImg.rows > 100 && grayImg.cols > 100) {
 		cv::Mat auImg;
 		auxiliaryImg(grayImg, auImg);
-		cv::Mat lbp;
-		LBPImage(grayImg, lbp);
 		for (int r = 12; r < grayImg.rows - 48; r += 24) {
 			for (int c = 12; c < grayImg.cols - 48; c += 24) {
 				float v = auImg.at<float>(r + 1, c + 1) +
@@ -291,9 +289,9 @@ void CLBPCarDetect::train(const char* posTxtFile, const char* negTxtFile, const 
 	// these two parameters are got by grid search
 	svm_parameter param;
 	param.svm_type = C_SVC; param.kernel_type = LINEAR;
-	param.degree = 3; param.gamma = 0.0078125;	
+	param.degree = 3; param.gamma = 0.0059208;	
 	param.coef0 = 0; param.nu = 0.5; 
-	param.cache_size = 100; param.C = 32;
+	param.cache_size = 100; param.C = 59.72;
 	param.eps = 1e-3; param.p = 0.1;
 	param.shrinking = 1; param.probability = 0;
 	param.nr_weight = 0; param.weight_label = NULL;
