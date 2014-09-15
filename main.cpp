@@ -6,7 +6,7 @@
 /*
 int main()
 {
-	std::string textFilePath("./imageData/negative_train2_path.txt");
+	std::string textFilePath("./imageData/huning/positive_train.txt");
 	std::vector<std::string> imgPaths;
 	readImagePaths(textFilePath, imgPaths);
 
@@ -22,23 +22,74 @@ int main()
 	}
 	std::cout << "100%" << std::endl;
 
-	std::string featureFilePath("./negative_train_feature_method2.dat");
-	writeSVMTrainingData(features, featureFilePath, -1);
+	std::string featureFilePath("./features/huning/positive_train_feature.dat");
+	writeSVMTrainingData(features, featureFilePath, 1);
+	system("pause");
+	return 0;
+}
+*/
+
+/*
+int main(int argc, char** argv)
+{
+	if (argc < 4) {
+		std::cout << "extractFeatureData.exe text_file_of_imagess_path text_file_of_feature_data positive_or_negative_flag" << std::endl;
+		std::cout << "positive_or_negative_flag must be 1 or -1, 1 respond for positive and -1 respond for negative" << std::endl;
+		return 1;
+	}
+	//std::string textFilePath("./imageData/huning/positive_train.txt");
+	std::string textFilePath(argv[1]);
+	std::vector<std::string> imgPaths;
+	readImagePaths(textFilePath, imgPaths);
+
+	std::vector<std::vector<float> > features;
+	gentech::CLBPCarDetect detector;
+	for (std::size_t i = 0; i < imgPaths.size(); ++i) {
+		std::cout << std::setw(2) << (int)(i * 1.0 / imgPaths.size() * 100) << "%";
+		cv::Mat img = cv::imread(imgPaths[i]);
+		std::vector<float> feature;
+		detector.computer(img, feature);
+		features.push_back(feature);
+		std::cout << "\b\b\b";
+	}
+	std::cout << "100%" << std::endl;
+
+	//std::string featureFilePath("./features/huning/positive_train_feature.dat");
+	std::string featureFilePath(argv[2]);
+	int flag = atoi(argv[3]);
+	writeSVMTrainingData(features, featureFilePath, flag);
+	system("pause");
+	return 0;
+}
+*/
+
+/*
+int main()
+{
+	const char* posTxtFile = "./imageData/huning/positive_train.txt";
+	const char* negTxtFile = "./imageData/huning/negative_train.txt";
+	const char* modelFile = "./huning.model";
+	gentech::CLBPCarDetect detector;
+
+	detector.train(posTxtFile, negTxtFile, modelFile);
 	system("pause");
 	return 0;
 }
 */
 
 
-int main()
+int main(int argc, char** argv)
 {
-	const char* posTxtFile = "./imageData/positive_train_path.txt";
-	const char* negTxtFile = "./imageData/negative_train2_path.txt";
-	const char* modelFile = "./car_lbp2_method2.model";
+	if (argc < 5) {
+		std::cout << "CarDetectorTrain.exe path_to_positive_images path_to_negative_images c_value, gamma_value" << std::endl;
+		return -1;
+	}
+	std::string posTxtFile(argv[1]);
+	std::string negTextFile(argv[2]);
+	double c = atof(argv[3]);
+	double gamma = atof(argv[4]);
 	gentech::CLBPCarDetect detector;
-
-	detector.train(posTxtFile, negTxtFile, modelFile);
-	system("pause");
+	detector.train(posTxtFile.c_str(), negTextFile.c_str(), c, gamma);
 	return 0;
 }
 
@@ -102,13 +153,14 @@ int main()
 }
 */
 
+
 /*
 int main()
 {
-	const char* modelFilePath = "./features/car_lbp2_method2.model";
-	float thres = 1.98f;
+	const char* modelFilePath = "./features/huning/huning.model";
+	float thres = 2.f;
 	gentech::CLBPCarDetect detector(modelFilePath, thres);
-	cv::Mat img = cv::imread("./testImages/00036.png");
+	cv::Mat img = cv::imread("./testImages/debugTmp/762.jpg");
 	std::vector<cv::Rect> carPos;
 	detector.detect(img, carPos);
 	for (std::size_t i = 0; i < carPos.size(); ++i) {
@@ -124,11 +176,11 @@ int main()
 /*
 int main()
 {
-	const char* modelFilePath = "./features/car_lbp2_method2.model";
-	float thres = 1.7f;
+	const char* modelFilePath = "./features/huning/huning.model";
+	float thres = 1.f;
 	gentech::CLBPCarDetect detector(modelFilePath, thres);
 
-	cv::VideoCapture video("./testImages/2014-04-14_15-29-01.avi");
+	cv::VideoCapture video("./testImages/data_scheme20120503202002000002302");
 	if (!video.isOpened()) {
 		std::cerr << "can not open the video." << std::endl;
 		system("pause");
@@ -142,15 +194,17 @@ int main()
 	while (true) {
 		video >> Frame;
 		if (!Frame.data) break;
+		cv::Rect rect(0, Frame.rows / 4, Frame.cols, Frame.rows * 3 / 4);
+		cv::Mat img = Frame(rect);
 		std::vector<cv::Rect> carPos;
-		detector.detect(Frame, carPos);
+		detector.detect(img, carPos);
 
 		for (std::size_t i = 0; i < carPos.size(); ++i) {
-			cv::rectangle(Frame, carPos[i], cv::Scalar(0, 255, 255));
+			cv::rectangle(img, carPos[i], cv::Scalar(0, 255, 255));
 		}
 		//sprintf_s(savepath, sizeof(savepath), "./test/%05d.png", index++);
 		//cv::imwrite(savepath, Frame);
-		cv::imshow("show", Frame); 
+		cv::imshow("show", img);
 		if (cv::waitKey(1) == 27) break;
 	}
 	return 0;
@@ -160,9 +214,9 @@ int main()
 /*
 int main()
 {
-	cv::Mat img = cv::imread("./testImages/1.png");
-	const char* modelFilePath = "./features/car_lbp2_method2.model";
-	float thres = 1.f;
+	cv::Mat img = cv::imread("./testImages/00013_neg.png");
+	const char* modelFilePath = "./features/huning/huning.model";
+	float thres = -1.f;
 	gentech::CLBPCarDetect detector(modelFilePath, thres);
 
 	float v = detector.predict(img);

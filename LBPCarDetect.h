@@ -35,6 +35,8 @@ public:
 	 * train a linear svm model used LBP feature histogram
 	 */
 	void train(const char* posTxtFile, const char* negTxtFile, const char* modelFile);
+
+	void train(const char* posTxtFile, const char* negTxtFile, double c, double gamma);
 protected:
 	void CLBPCarDetect::auxiliaryImg(cv::Mat& img, cv::Mat& auImg);
 

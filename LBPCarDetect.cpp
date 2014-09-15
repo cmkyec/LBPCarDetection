@@ -108,17 +108,17 @@ CLBPCarDetect::CLBPCarDetect(const char* modelFilePath, float thres)
 
 void CLBPCarDetect::computer(cv::Mat& img, std::vector<float>& features)
 {
-	CV_Assert(img.rows == 48 && img.cols == 48);
+	CV_Assert(img.rows == 60 && img.cols == 80);
 
 	static cv::Mat lbp;
 	LBPImage(img, lbp);
 
 	features.resize(58 * 9, 0);
 	float* p = &(features[0]);
-	// the boundary of the lbp is ignored, actually 46x46 rectangle is used.
-	for (int r = 1; r <= 23; r += 11) {
-		for (int c = 1; c <= 23; c += 11) {
-			cv::Rect rect(c, r, 24, 24);
+	// the boundary of the lbp is ignored, actually 78x58 rectangle is used.
+	for (int r = 1; r <= 29; r += 14) {
+		for (int c = 1; c <= 39; c += 19) {
+			cv::Rect rect(c, r, 40, 30);
 			histFill(lbp, rect, p);
 			p += 58;
 		}
@@ -223,18 +223,35 @@ void CLBPCarDetect::detect(cv::Mat& img, std::vector<cv::Rect>& carPos)
 	std::vector<cv::Rect> rawCarPos;
 	std::vector<float> scores;
 	double shrink = 1.0;
-	while (grayImg.rows > 100 && grayImg.cols > 100) {
-		cv::Mat auImg;
-		auxiliaryImg(grayImg, auImg);
-		for (int r = 12; r < grayImg.rows - 48; r += 24) {
-			for (int c = 12; c < grayImg.cols - 48; c += 24) {
-				float v = auImg.at<float>(r + 1, c + 1) +
-					  auImg.at<float>(r + 25, c + 25) -
-					  auImg.at<float>(r + 25, c + 1)  -
-					  auImg.at<float>(r + 1, c + 25);
-				v = v / 576;
+	//while (grayImg.rows > 320 && grayImg.cols > 180) {
+	//	cv::Mat auImg;
+	//	auxiliaryImg(grayImg, auImg);
+	//	for (int r = 12; r < grayImg.rows - 48; r += 24) {
+	//		for (int c = 12; c < grayImg.cols - 48; c += 24) {
+	//			float v = auImg.at<float>(r + 1, c + 1) +
+	//				  auImg.at<float>(r + 25, c + 25) -
+	//				  auImg.at<float>(r + 25, c + 1)  -
+	//				  auImg.at<float>(r + 1, c + 25);
+	//			v = v / 576;
+	//			if (v > m_b) {
+	//				cv::Rect rect(c, r, 48, 48);
+	//				rect.x = cvRound(rect.x / shrink);
+	//				rect.y = cvRound(rect.y / shrink);
+	//				rawCarPos.push_back(rect);
+	//				scores.push_back(v);
+	//			}
+	//		}
+	//	}
+	//	shrink *= 0.85;
+	//	cv::resize(grayImg, grayImg, cv::Size(), shrink, shrink);
+	//}
+	while (grayImg.rows > 60 && grayImg.cols > 80) {
+		for (int r = 1; r < grayImg.rows - 60; r += 5) {
+			for (int c = 1; c < grayImg.cols - 80; c += 5) {
+				cv::Rect rect(c, r, 80, 60);
+				cv::Mat tmp = grayImg(rect);
+				float v = predict(tmp);
 				if (v > m_b) {
-					cv::Rect rect(c, r, 48, 48);
 					rect.x = cvRound(rect.x / shrink);
 					rect.y = cvRound(rect.y / shrink);
 					rawCarPos.push_back(rect);
@@ -242,10 +259,11 @@ void CLBPCarDetect::detect(cv::Mat& img, std::vector<cv::Rect>& carPos)
 				}
 			}
 		}
-		shrink *= 0.85;
+		shrink *= 0.95;
 		cv::resize(grayImg, grayImg, cv::Size(), shrink, shrink);
 	}
-	rectsMerge(rawCarPos, carPos, scores);
+	carPos = rawCarPos;
+	//rectsMerge(rawCarPos, carPos, scores);
 } 
 
 inline void copyFeatureToNode(std::vector<float>& feature, svm_node* node)
@@ -289,9 +307,9 @@ void CLBPCarDetect::train(const char* posTxtFile, const char* negTxtFile, const 
 	// these two parameters are got by grid search
 	svm_parameter param;
 	param.svm_type = C_SVC; param.kernel_type = LINEAR;
-	param.degree = 3; param.gamma = 0.0059208;	
+	param.degree = 3; param.gamma = 0.0078125;	
 	param.coef0 = 0; param.nu = 0.5; 
-	param.cache_size = 100; param.C = 59.72;
+	param.cache_size = 100; param.C = 55.7152;
 	param.eps = 1e-3; param.p = 0.1;
 	param.shrinking = 1; param.probability = 0;
 	param.nr_weight = 0; param.weight_label = NULL;
@@ -315,6 +333,72 @@ void CLBPCarDetect::train(const char* posTxtFile, const char* negTxtFile, const 
 	}
 	svIndicesFile << std::endl;
 	svm_save_model(modelFile, model);
+
+	delete[] sv_indices;
+	svm_free_model_content(model);
+	svm_free_and_destroy_model(&model);
+	for (int i = 0; i < nsamples; ++i) delete[] pnodes[i];
+	delete[] pnodes;
+}
+
+void CLBPCarDetect::train(const char* posTxtFile, const char* negTxtFile, double c, double gamma)
+{
+	std::vector<std::string> posImgsPath, negImgsPath;
+	readImagePaths(posTxtFile, posImgsPath);
+	readImagePaths(negTxtFile, negImgsPath);
+	int nsamples = (int)(posImgsPath.size() + negImgsPath.size());
+	svm_node** pnodes = new svm_node*[nsamples];
+	double* y = new double[nsamples];
+	for (int i = 0; i < (int)posImgsPath.size(); ++i) {
+		cv::Mat img = cv::imread(posImgsPath[i]);
+		std::vector<float> feature;
+		computer(img, feature);
+		pnodes[i] = new svm_node[(int)feature.size() + 1];
+		copyFeatureToNode(feature, pnodes[i]);
+		y[i] = 1;
+	}
+	for (int i = 0; i < (int)negImgsPath.size(); ++i) {
+		cv::Mat img = cv::imread(negImgsPath[i]);
+		std::vector<float> feature;
+		computer(img, feature);
+		pnodes[(int)posImgsPath.size() + i] = new svm_node[(int)feature.size() + 1];
+		copyFeatureToNode(feature, pnodes[(int)posImgsPath.size() + i]);
+		y[(int)posImgsPath.size() + i] = -1;
+	}
+	svm_problem problem;
+	problem.l = nsamples; problem.x = pnodes; problem.y = y;
+	std::cout << "problem is done." << std::endl;
+
+	// all parameters are set to default, except for C and gamma
+	// these two parameters are got by grid search
+	svm_parameter param;
+	param.svm_type = C_SVC; param.kernel_type = LINEAR;
+	param.degree = 3; param.gamma = gamma;
+	param.coef0 = 0; param.nu = 0.5;
+	param.cache_size = 100; param.C = c;
+	param.eps = 1e-3; param.p = 0.1;
+	param.shrinking = 1; param.probability = 0;
+	param.nr_weight = 0; param.weight_label = NULL;
+	param.weight = NULL;
+	std::cout << "param is done." << std::endl;
+
+	const char* errmsg = svm_check_parameter(&problem, &param);
+	if (errmsg) {
+		std::cout << "something error: " << errmsg << std::endl;
+		return;
+	}
+
+	svm_model* model = svm_train(&problem, &param);
+	std::cout << "train end." << std::endl;
+
+	int* sv_indices = new int[model->l];
+	svm_get_sv_indices(model, sv_indices);
+	std::ofstream svIndicesFile("svIndices.txt");
+	for (int i = 0; i < model->l; ++i) {
+		svIndicesFile << sv_indices[i] << ",";
+	}
+	svIndicesFile << std::endl;
+	svm_save_model("svm.model", model);
 
 	delete[] sv_indices;
 	svm_free_model_content(model);
